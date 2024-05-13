@@ -4,7 +4,15 @@
 
 <!-- ========================= SECTION CONTENT ========================= -->
 <section class="section-conten padding-y" style="min-height:84vh">
+    {% if request.GET.command == 'verification' %}
 
+    <div class="container mx-auto alert alert-info text-center" role="'alert" style="max-width: 1024px; margin-top:100px;">
+        Thanks for registering with us. We have sent you a verification email at your email address{{request.get.email}}. Please verify it
+        <br><br>
+        Alreadfy Verified ? <a href="{% url 'login' %}">Login</a>
+    </div>
+
+    {% else %}
     <!-- ============================ COMPONENT LOGIN   ================================= -->
     <div class="card mx-auto" style="max-width: 380px; margin-top:100px;">
         <div class="card-body">
@@ -33,7 +41,7 @@
     <p class="text-center mt-4">Don't have account? <a href="{% url 'register' %}">Sign up</a></p>
     <br><br>
     <!-- ============================ COMPONENT LOGIN  END.// ================================= -->
-
+    {% endif %}
 
 </section>
 <!-- ========================= SECTION CONTENT END// ========================= -->
