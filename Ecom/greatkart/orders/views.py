@@ -1,8 +1,14 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, HttpResponse
 from carts.models import CartItem
 from .forms import OrderForm
 from .models import Order
 import datetime 
+
+
+from paypal.standard.forms import PayPalPaymentsForm
+from django.conf import settings
+import uuid
+from django.urls import reverse
 
 def payments(request):
     return render(request, 'orders/payments.html')
@@ -53,13 +59,31 @@ def place_order(request, total=0, quantity=0):
             data.save()
 
             order = Order.objects.get(user=current_user, is_ordered=False, order_number=order_number)
+
+            host = request.get_host()
+            
+            paypal_checkout = {
+                'business': settings.PAYPAL_RECEIVER_EMAIL,
+                'amount': total+tax,
+                'item_name': order,
+                'invoice': order_number,
+                'currency_code': 'USD',
+                'notify_url': f"http://{host}{reverse('paypal-ipn')}",
+                'return_url': f"http://{host}{reverse('payment-success', kwargs = {'order_number': order_number})}",
+                'cancel_url': f"http://{host}{reverse('payment-failed', kwargs = {'order_number': order_number})}",
+            }
+
+            paypal_payment = PayPalPaymentsForm(initial=paypal_checkout)
+
             context = {
                 'order':order,
                 'cart_items':cart_items,
                 'total': total,
                 'tax': tax,
                 'grand_total': grand_total,
+                'paypal': paypal_payment,
             }
+
             return render(request, 'orders/payments.html', context)
         else:
             print(form.errors)
@@ -67,3 +91,13 @@ def place_order(request, total=0, quantity=0):
 
     # If not a POST request, redirect back to the cart or home page
     return redirect('store')
+
+
+def PaymentSuccessful(request, order_number):
+
+    return HttpResponse(f"Order {order_number} successful")
+
+def paymentFailed(request, order_number):
+
+
+    return HttpResponse(f"Order {order_number} failed")
