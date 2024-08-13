@@ -1,14 +1,23 @@
+import logging
 from django.shortcuts import render, redirect, HttpResponse
 from carts.models import CartItem
 from .forms import OrderForm
-from .models import Order
+from .models import Order, Payment, OrderProduct
 import datetime 
+from django.views.decorators.csrf import csrf_exempt
 
 
 from paypal.standard.forms import PayPalPaymentsForm
 from django.conf import settings
 import uuid
 from django.urls import reverse
+
+
+import logging
+import time
+from django.http import JsonResponse
+
+
 
 def payments(request):
     return render(request, 'orders/payments.html')
@@ -59,18 +68,26 @@ def place_order(request, total=0, quantity=0):
             data.save()
 
             order = Order.objects.get(user=current_user, is_ordered=False, order_number=order_number)
+            # Generate item names from cart items
+            item_names = [item.product.product_name for item in cart_items]
+            item_name_str = ', '.join(item_names)
+
 
             host = request.get_host()
-            
+
             paypal_checkout = {
                 'business': settings.PAYPAL_RECEIVER_EMAIL,
                 'amount': total+tax,
-                'item_name': order,
-                'invoice': order_number,
+                'custom':current_user, 
                 'currency_code': 'USD',
-                'notify_url': f"http://{host}{reverse('paypal-ipn')}",
+                'item_name': item_name_str,
+                'invoice': str(uuid.uuid4()),
+                "item_number":order_number,
+                'notify_url': f"https://6e60-2405-201-680a-b07c-ccce-12ef-cdb2-460d.ngrok-free.app{reverse('paypal-ipn')}",
                 'return_url': f"http://{host}{reverse('payment-success', kwargs = {'order_number': order_number})}",
                 'cancel_url': f"http://{host}{reverse('payment-failed', kwargs = {'order_number': order_number})}",
+
+                
             }
 
             paypal_payment = PayPalPaymentsForm(initial=paypal_checkout)
@@ -83,6 +100,7 @@ def place_order(request, total=0, quantity=0):
                 'grand_total': grand_total,
                 'paypal': paypal_payment,
             }
+                       
 
             return render(request, 'orders/payments.html', context)
         else:
@@ -92,12 +110,57 @@ def place_order(request, total=0, quantity=0):
     # If not a POST request, redirect back to the cart or home page
     return redirect('store')
 
+def check_order_status(request, order_number):
+    timeout = 30  # seconds to keep the request open
+    start_time = time.time()
 
+    while time.time() - start_time < timeout:
+        try:
+            order = Order.objects.get(order_number=order_number)
+            if order.is_ordered:
+                return JsonResponse({'is_ordered': True})
+        except Order.DoesNotExist:
+            pass
+        
+        time.sleep(1)  # Sleep for 1 second before checking again
+
+    return JsonResponse({'is_ordered': False})
+
+@csrf_exempt
 def PaymentSuccessful(request, order_number):
+    print(order_number)
 
-    return HttpResponse(f"Order {order_number} successful")
+    # return HttpResponse(f"Order {order_number} successful")
+
+    try:
+        order = Order.objects.get(order_number=order_number, is_ordered=True)
+        print('1 or 2')
+        ordered_products = OrderProduct.objects.filter(order_id=order.id)
+        payment = order.payment  # Directly access the payment field of the order
+
+        subtotal = 0
+        for i in ordered_products:
+            subtotal += i.product_price * i.quantity
+
+        context = {
+            'order': order,
+            'ordered_products': ordered_products,
+            'order_number': order.order_number,
+            'transID': payment.payment_id if payment else None,
+            'payment': payment,
+            'subtotal': subtotal,
+        }
+        return render(request, 'orders/payment_successful.html', context)
+    except (Payment.DoesNotExist, Order.DoesNotExist):
+            context = {
+                'order_number':order_number
+            }
+            return render(request, 'orders/payment_processing.html', context=context)
 
 def paymentFailed(request, order_number):
 
-
-    return HttpResponse(f"Order {order_number} failed")
+    # return HttpResponse(f"Order {order_number} failed")
+    context = {
+        order_number : order_number,
+    }
+    return render(request, 'orders/payment_successful.html', context)

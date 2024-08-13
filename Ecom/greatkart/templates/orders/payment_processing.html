@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+<section>
+    <h1 style="text-align: center;">
+        Payment processing....
+    </h1>
+</section>
+
+{% block extra_js %}
+<script>
+    $(document).ready(function () {
+        const orderNumber = '{{ order_number }}';
+
+        if (!orderNumber) {
+            console.error('Order number is not defined');
+            return;
+        }
+
+        const checkOrderStatus = () => {
+            console.log('Checking order status');
+            $.ajax({
+                url: `/orders/check-order-status/${orderNumber}/`,
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    console.log('Data received:', data);
+                    if (data.is_ordered) {
+                        window.location.href = `/orders/place_order/payment-success/${orderNumber}/`;
+                    } else {
+                        setTimeout(checkOrderStatus, 1000); // Poll every second
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    setTimeout(checkOrderStatus, 5000); // Retry after 5 seconds in case of error
+                }
+            });
+        };
+
+        // Start polling immediately
+        checkOrderStatus();
+    });
+</script>
+{% endblock %}
+
+{% endblock %}
+
