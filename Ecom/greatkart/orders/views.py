@@ -83,7 +83,7 @@ def place_order(request, total=0, quantity=0):
                 'item_name': item_name_str,
                 'invoice': str(uuid.uuid4()),
                 "item_number":order_number,
-                'notify_url': f"https://6e60-2405-201-680a-b07c-ccce-12ef-cdb2-460d.ngrok-free.app{reverse('paypal-ipn')}",
+                'notify_url': f"https://bb23-2405-201-680a-b07c-a482-6c31-7d21-4b2e.ngrok-free.app{reverse('paypal-ipn')}",
                 'return_url': f"http://{host}{reverse('payment-success', kwargs = {'order_number': order_number})}",
                 'cancel_url': f"http://{host}{reverse('payment-failed', kwargs = {'order_number': order_number})}",
 
